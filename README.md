@@ -1,5 +1,4 @@
 
-
 ## Gender Recognition
 Gender recognition is a salient application where you need to identify the 
 gender of a person based on their face picture. In this repository, a custom made
@@ -7,8 +6,8 @@ convolutional neural network has been used to identify gender. Furthermore, you 
 integrate this classifier with detector for second stage classification.
 Furthermore, you can train the classifier on your own dataset.
 
-
-
+![cnn_custom](https://user-images.githubusercontent.com/61932757/182686060-1e6cc3ee-e44a-4425-889a-aaddf776f1e4.png)
+Figure 1: Custom Designed Convolutional Neural Network Classifier
 
 
 ## Installation
