@@ -1,0 +1,9 @@
+# install the requried packages
+#first update pip
+#pip install --upgrade pip
+pillow
+torch
+torchvision
+albumentations
+matplotlib
+
