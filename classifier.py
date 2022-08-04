@@ -14,10 +14,12 @@ import argparse
 from models import custom_model
 import torch.nn as nn
 import torch.optim as optim
+from torch.optim import lr_scheduler
 
 from torchvision import datasets, models, transforms
 import os
 
+from torchvision.models import resnet18,  ResNet18_Weights
 # check device 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") # device object
 print(f'accelartor is being used?: {device}')
@@ -33,7 +35,7 @@ def read_args():
     parser.add_argument("--batch", type = int, help = "batch size")
     parser.add_argument("--workers", type = int, help= "number of workers")
     parser.add_argument("--classes", type = int, help= "number of classes")
-    # parser.add_argument("--pretrained", action= "store_true", help = "use pretrained model")
+    parser.add_argument("--pretrained", action='store_true', help="use resnet18 model")
     return parser.parse_args()
 
 ## load the dataset
@@ -55,7 +57,12 @@ def load_dataset(data_dir, img, batch_size, workers):
                 """
     transforms_train = transforms.Compose([
     transforms.Resize((img, img)),
-    transforms.RandomHorizontalFlip(), # data augmentation, and you can add more data augmentation options here for better generaliztion of the model
+    transforms.RandomHorizontalFlip(p=0.6), #add horizontal flip randonly
+    transforms.RandomRotation(degrees = (0, 45)),
+    transforms.RandomAdjustSharpness(sharpness_factor=2),
+    transforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5)),
+    #transforms.RandomPerspective(distortion_scale=0.3, p=0.4),
+    transforms.RandomResizedCrop(size=(img, img)),
     transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]) # normalization
     ])
@@ -80,7 +87,7 @@ def load_dataset(data_dir, img, batch_size, workers):
     return train_dataloader, val_dataloader
 
 def train(model, num_epochs, train_dataloader, optimizer,
-          criterion, train_datasets, val_dataloader, val_datasets):
+          criterion, train_datasets, val_dataloader, val_datasets, schedular):
     """train classifier on dataset with num_epochs
     Argument: num_epochs
               train the classifier for num-epochs"""
@@ -112,7 +119,8 @@ def train(model, num_epochs, train_dataloader, optimizer,
             # print(running_loss)
         epoch_loss = running_loss / len(train_datasets)
         epoch_acc = running_corrects / len(train_datasets) * 100.
-        print('[Train #{}] Loss: {:.4f} Acc: {:.4f}% Time: {:.4f}s'.format(epoch, epoch_loss, epoch_acc, time.time() - start_time))
+        schedular.step()
+        print('Epoch: {} Loss: {:.4f} Acc: {:.4f}% Time: {:.4f}s'.format(epoch, epoch_loss, epoch_acc, time.time() - start_time))
 
         model.eval()
         with torch.no_grad():
@@ -132,10 +140,20 @@ def train(model, num_epochs, train_dataloader, optimizer,
 
             epoch_loss = running_loss / len(val_datasets)
             epoch_acc = running_corrects / len(val_datasets) * 100.
-            if best_acc < epoch_acc:
-                save_path = f'{epoch}_epoch_face_gender_classification_transfer_learning_with_ResNet18.pth'
-                torch.save(model.state_dict(), save_path)
-            print('[Validation #{}] Loss: {:.4f} Acc: {:.4f}% Time: {:.4f}s'.format(epoch, epoch_loss, epoch_acc, time.time() - start_time))
+            if best_acc < epoch_acc or epoch == num_epochs -1:
+                if epoch == num_epochs -1:
+                     save_path = 'last.pth'
+                     torch.save(model.state_dict(), save_path)
+                else:
+                    best_acc = epoch_acc
+                    contents = os.getcwd()
+                    contents_list = os.listdir(contents)
+                    for content in contents_list:
+                        if content.endswith('.pth'):
+                            os.remove(content)
+                    save_path = f'{epoch}_epoch_face_gender_classification_transfer_learning_with_ResNet18.pth'
+                    torch.save(model.state_dict(), save_path)
+            print('Validation: {} Loss: {:.4f} Acc: {:.4f}% Time: {:.4f}s'.format(epoch, epoch_loss, epoch_acc, time.time() - start_time))
 
 
 
@@ -146,14 +164,24 @@ def main():
     print("done!!!\n")
 
     print("loading the model and setting up model configuratin!!\n")
-    model = custom_model(args.classes, args.img).to(device)
+    
+
+    # laod the model
+    if args.pretrained:
+        model = resnet18(weights=ResNet18_Weights.DEFAULT)
+        in_ftrs = model.fc.in_features
+        model.fc = nn.Linear(in_ftrs, args.classes)
+        model = model.to(device)
+    else:
+        model = custom_model(args.classes, args.img).to(device)
     #setting SGD optimizer, change to Adam if you want, you could also change learning rate by changing lr
-    optimizer= optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    optimizer= optim.Adam(model.parameters(), lr=0.001)
+    exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
     criterion = nn.CrossEntropyLoss()
     print("done!!!!\n")
     print("Now training!!")
     train(model, args.epochs, train_dataloader, optimizer,
-          criterion, train_datasets, val_dataloader, val_datasets)
+          criterion, train_datasets, val_dataloader, val_datasets, exp_lr_scheduler)
     print("Training done!!")
 
 if __name__ == "__main__":
