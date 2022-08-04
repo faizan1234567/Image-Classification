@@ -13,7 +13,7 @@ import argparse
 from models import custom_model
 import torch.nn as nn
 import torch.optim as optim
-
+from torchvision.models import resnet18
 from torchvision import datasets, models, transforms
 import os
 import time
@@ -29,6 +29,7 @@ def read_args():
     parser.add_argument("--batch", type=int, help = 'batch size')
     parser.add_argument("--workers", type = int, help= "number of workers")
     parser.add_argument("--display_samples", action = "store_true", help= "display some images for visualization from test set..")
+    parser.add_argument("--pretrained", action= "store_true", help="pretrained model")
     return parser.parse_args()
 
 
@@ -60,7 +61,7 @@ def imshow(images, predictions):
     plt.figure(figsize=(10, 10))
     for i,img in enumerate(images):
         img = img / 2 + 0.5     # unnormalize
-        npimg = img.numpy()
+        npimg = img.cpu().numpy()
         plt.subplot(2, 8, i+1)
         plt.imshow(np.transpose(npimg, (1, 2, 0)))
         plt.xticks([])
@@ -80,7 +81,7 @@ def visualize_samples(images, predictions):
     imshow(images, predictions)
     # print('GroundTruth: ', ' '.join(f'{classes[predictions[j]]:5s}' for j in range(16)))
 
-def test_all_data(testloader, model, speed = False, all_classes=True):
+def test_all_data(testloader, model, device, speed = False, all_classes=True):
     '''test all data set accuracy
     args: test_loader (batched data)
     return accuracy on all data
@@ -97,6 +98,7 @@ def test_all_data(testloader, model, speed = False, all_classes=True):
         for data in testloader:
             count+=1
             images, labels = data
+            images, labels = images.to(device), labels.to(device)
             # calculate outputs by running images through the network
             tic = time.time()
             outputs = model(images)
@@ -158,11 +160,19 @@ def main():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'device:  {device}')
     # our custom model
-    print("importing custom model!!\n")
-    net = custom_model(num_classes=2, img_shape= args.img)
-    # load the trained weights 
-    net.load_state_dict(torch.load(args.weights, map_location=torch.device('cpu')))
-    print("weights loaded into the model!!\n")
+ 
+    print("importing model!!\n")
+    if args.pretrained:
+        net = resnet18(pretrained=True)
+        in_ftrs = net.fc.in_features
+        net.fc = nn.Linear(in_ftrs, 2)
+        net = net.to(device)
+    else:
+
+        net = custom_model(num_classes=2, img_shape= args.img).to(device)
+        # load the trained weights 
+        net.load_state_dict(torch.load(args.weights, map_location=torch.device('cpu')))
+        print("weights loaded into the model!!\n")
 
     print('Now laoding test data!!\n')
     test_loader = load_data(args.test_data, args.img, args.batch)
@@ -170,7 +180,7 @@ def main():
     
     dataiter = iter(test_loader)
     images, labels = dataiter.next()
-    
+    images, labels = images.to(device), labels.to(device)
     outputs = net(images)
     skip, predicted = torch.max(outputs, 1)
     classes = ("female", "male")
@@ -181,13 +191,13 @@ def main():
     time.sleep(5)
     print('checking accuracy on all data!!\n')
     if not args.speed and not args.all_classes_accuracy:
-        acc = test_all_data(test_loader, net, False, False)
+        acc = test_all_data(test_loader, net, device, False, False)
     elif not args.speed and args.all_classes_accuracy:
-        acc = test_all_data(test_loader, net, False, True)
+        acc = test_all_data(test_loader, net, device, False, True)
     elif args.speed and not args.all_classes_accuracy:
-        acc = test_all_data(test_loader, net, True, False)
+        acc = test_all_data(test_loader, net, device, True, False)
     else:
-        acc = test_all_data(test_loader, net, True, True)
+        acc = test_all_data(test_loader, net, device, True, True)
     print('done!!!\n')
 
 if __name__ == "__main__":
