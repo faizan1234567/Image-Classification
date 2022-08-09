@@ -29,13 +29,14 @@ def read_args():
     """read commnad line arguments"""
     parser = argparse.ArgumentParser(description= "adding commmand line args for second stage classifier")
     parser.add_argument("--epochs", type=int, help= "number of epochs to train the model for..")
-    parser.add_argument("--weights", type = str, help= "weight file path, pth extension")
+    parser.add_argument("--weights", type = str, help= "weight file path, pth extension, or pretrained model weight name")
     parser.add_argument("--data", type = str, help = "dataset directory")
     parser.add_argument("--img", type = int, help= "image shpae to resize before training")
     parser.add_argument("--batch", type = int, help = "batch size")
     parser.add_argument("--workers", type = int, help= "number of workers")
     parser.add_argument("--classes", type = int, help= "number of classes")
-    parser.add_argument("--pretrained", action='store_true', help="use resnet18 model")
+    parser.add_argument("--pretrained", action='store_true', help="i.e. use resnet18 model or others in pytorch.org")
+    parser.add_argument("--name",type = str, help= "pretrained model name")
     return parser.parse_args()
 
 ## load the dataset
@@ -166,9 +167,10 @@ def main():
     print("loading the model and setting up model configuratin!!\n")
     
 
-    # laod the model
+    # laod the model WITH THE LATEST Weights, please use model name with pytorch import convention
+    # and model weight name should be like ResNet101 etc, for more see pytorch.org
     if args.pretrained:
-        model = resnet18(weights=ResNet18_Weights.DEFAULT)
+        model = models.__dict__[args.name](weights = f"{args.weights}_Weights.DEFAULT")
         in_ftrs = model.fc.in_features
         model.fc = nn.Linear(in_ftrs, args.classes)
         model = model.to(device)
