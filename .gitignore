@@ -1,6 +1,6 @@
 # ignore all .pth files
-*.pth
+# *.pth
 # ignore files in classification directory
 classification/
 # ignore __pychache__ directory as well
-__pychache__/
+**/__pychache__/
