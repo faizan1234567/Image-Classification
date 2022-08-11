@@ -6,4 +6,9 @@ torch
 torchvision
 albumentations
 matplotlib
+tensorflow 
+scipy
+numpy
+pandas
+
 
