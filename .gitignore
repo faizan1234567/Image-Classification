@@ -3,4 +3,4 @@
 # ignore files in classification directory
 classification/
 # ignore __pychache__ directory as well
-**/__pychache__/
+**/__pycache__/
